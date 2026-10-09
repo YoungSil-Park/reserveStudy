@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>도서관 좌석 예약 & 관리 시스템</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased">
+
+  <!-- 1. 상단 글로벌 네비게이션 헤더 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-lg shadow-xs">
+            <i class="fa-solid fa-book-bookmark"></i>
+          </div>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-none">
+              스마트 도서관 좌석 예약 & 관리
+            </h1>
+            <p class="text-xs text-slate-500 mt-1">25석 실시간 운영 · 시작/종료 시간 선택 · 관리자 리스트</p>
+          </div>
+        </div>
+
+        <div class="md:hidden flex items-center gap-2">
+          <button onclick="toggleAdminView()" id="mobileAdminToggleBtn" class="px-2.5 py-1.5 bg-slate-100 text-slate-800 text-xs font-semibold rounded-lg">
+            관리자 모드
+          </button>
+        </div>
+      </div>
+
+      <!-- 학번 입력 및 모드 전환 -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- 뷰 모드 전환 버튼 (데스크톱) -->
+        <div class="hidden sm:flex items-center p-1 bg-slate-100 rounded-lg mr-1">
+          <button id="viewTabUser" onclick="switchView('user')" class="px-3 py-1.5 text-xs font-semibold rounded-md bg-white text-slate-900 shadow-2xs">
+            좌석 배치도 (학생용)
+          </button>
+          <button id="viewTabAdmin" onclick="switchView('admin')" class="px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900">
+            관리자 전체 예약 확인
+          </button>
+        </div>
+
+        <!-- 학생 이름 드롭다운 선택자 -->
+        <div class="relative flex-1 sm:w-56">
+          <select
+            id="userSelect"
+            onchange="onStudentChange(this.value)"
+            class="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-medium text-slate-900 cursor-pointer transition shadow-2xs"
+          >
+          </select>
+        </div>
+
+        <button
+          onclick="fetchUserReservations()"
+          class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium rounded-lg transition whitespace-nowrap shadow-xs flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-magnifying-glass text-xs"></i>
+          <span>내 예약 확인</span>
+        </button>
+
+        <button
+          onclick="fetchSeats()"
+          class="p-2 text-slate-600 hover:text-slate-900 border border-slate-200 bg-white hover:bg-slate-50 rounded-lg transition"
+          title="새로고침"
+        >
+          <i class="fa-solid fa-rotate-right text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 2. 메인 컨테이너 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full space-y-6">
+
+    <!-- 내 예약 현황 배너 (예약된 좌석이 있을 때 항상 상단 노출) -->
+    <section id="myReservationSection" class="hidden">
+      <div class="bg-white border-2 border-emerald-400 rounded-xl p-5 shadow-xs bg-gradient-to-r from-emerald-50/80 via-emerald-50/30 to-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-start gap-4">
+          <div class="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 text-lg shadow-xs">
+            <i class="fa-solid fa-chair"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-emerald-800 uppercase tracking-wider">이용 중인 좌석</span>
+              <span class="text-slate-300">·</span>
+              <span class="text-xs text-slate-600 font-mono font-medium" id="resUserId">학번 20240001</span>
+              <span class="text-slate-300">·</span>
+              <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">예약 확인됨</span>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 mt-1">
+              <span id="resSeatName" class="text-emerald-700">S01</span>
+              <span class="text-sm font-normal text-slate-600 ml-1.5" id="resZoneName">(일반)</span>
+            </h2>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-2 font-mono">
+              <span><i class="fa-regular fa-clock mr-1 text-slate-400"></i>시작: <strong id="resStartTime" class="text-slate-900">-</strong></span>
+              <span>·</span>
+              <span>종료 예정: <strong id="resEndTime" class="text-emerald-800 font-bold">-</strong></span>
+              <span id="resIdSpan" class="text-slate-400">· 예약번호: <span id="resId">-</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <button
+            onclick="handleCancelReservation()"
+            class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold rounded-lg transition shadow-xs flex items-center gap-2"
+          >
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <span>퇴실 하기 (반납)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- [VIEW A] 학생용 좌석 배치도 화면 -->
+    <div id="viewUserSeats" class="space-y-6">
+      
+      <!-- 통계 스트립 -->
+      <section class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white border border-slate-200 rounded-xl p-3.5">
+          <div class="text-xs text-slate-500">전체 좌석</div>
+          <div class="text-xl font-bold text-slate-900 mt-1" id="statTotal">25석</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">25석 실시간 운영</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3.5">
+          <div class="text-xs text-slate-500 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>사용 가능</span>
+          </div>
+          <div class="text-xl font-bold text-emerald-700 mt-1" id="statAvailable">0석</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">즉시 예약 가능</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3.5">
+          <div class="text-xs text-slate-500 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            <span>사용 중</span>
+          </div>
+          <div class="text-xl font-bold text-rose-700 mt-1" id="statOccupied">0석</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">종료 예정 시간 표시 중</div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3.5">
+          <div class="text-xs text-slate-500 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>점검 중</span>
+          </div>
+          <div class="text-xl font-bold text-slate-700 mt-1" id="statDisabled">0석</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">좌석 정비</div>
+        </div>
+      </section>
+
+      <!-- 구역 필터 바 -->
+      <section class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div id="zoneFilters" class="flex flex-wrap items-center gap-1.5">
+          <button onclick="setZoneFilter('all')" class="zone-tab-btn px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white" data-zone="all">
+            전체 보기 (25)
+          </button>
+        </div>
+        <div class="text-xs text-slate-600 font-medium">
+          * 사용 중인 좌석에는 <strong class="text-rose-600">종료 시간</strong>이 표시됩니다.
+        </div>
+      </section>
+
+      <!-- 25개 좌석 그리드 뷰 (사용중인 좌석에 종료시간 표시) -->
+      <section>
+        <div id="seatGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-3.5">
+          <!-- 동적 렌더링 -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- [VIEW B] 관리자 전체 예약 확인 화면 (상태별 색상 구분) -->
+    <div id="viewAdminDashboard" class="hidden space-y-6">
+      <section class="bg-white border border-indigo-200 rounded-xl p-5 bg-gradient-to-r from-indigo-50/60 to-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-start gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-shield-halved text-lg"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">도서관 열람실 관리자 콘솔 · 전체 예약 모니터링</h2>
+            <p class="text-xs text-slate-500 mt-0.5">현재 예약된 모든 목록을 실시간으로 확인하고 상태별 색상으로 구분하여 관리합니다.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-md font-semibold">● 이용중 (초록)</span>
+          <span class="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-md font-semibold">● 종료임박 (주황)</span>
+          <span class="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md font-semibold">● 이용완료 (회색)</span>
+          <span class="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-md font-semibold">● 취소/반납 (로즈)</span>
+        </div>
+      </section>
+
+      <!-- 관리자 리스트 필터 탭 -->
+      <section class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-1.5" id="adminFilterBtns">
+          <button onclick="setAdminFilter('all')" class="admin-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white" data-af="all">전체 리스트</button>
+          <button onclick="setAdminFilter('active')" class="admin-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700" data-af="active">이용 중 (초록)</button>
+          <button onclick="setAdminFilter('expiring')" class="admin-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700" data-af="expiring">종료 임박 (주황)</button>
+          <button onclick="setAdminFilter('completed')" class="admin-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700" data-af="completed">이용 완료 (회색)</button>
+        </div>
+
+        <div class="relative w-64">
+          <input
+            type="text"
+            id="adminSearchInput"
+            oninput="renderAdminTable()"
+            placeholder="학번, 좌석, 예약ID 검색"
+            class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+          />
+        </div>
+      </section>
+
+      <!-- 전체 예약 목록 테이블 -->
+      <section class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse font-mono">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-sans">
+                <th class="py-3 px-4">예약 ID</th>
+                <th class="py-3 px-4">좌석 및 구역</th>
+                <th class="py-3 px-4">예약자 학번</th>
+                <th class="py-3 px-4">시작 시간</th>
+                <th class="py-3 px-4">종료 시간 (예정)</th>
+                <th class="py-3 px-4">이용 시간</th>
+                <th class="py-3 px-4">현재 상태</th>
+                <th class="py-3 px-4 text-right">관리 작업</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody" class="divide-y divide-slate-100">
+              <!-- JS 동적 렌더링 -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- 하단 푸터 -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>© 도서관 좌석 예약 & 관리 시스템 · 원활한 이용을 위해 반납 시간을 준수해주세요.</p>
+      <p class="font-mono text-[11px] text-slate-400">Google Apps Script API 연동</p>
+    </div>
+  </footer>
+
+  <!-- 좌석 예약 팝업 모달 (시작 시간 선택 + 이용 시간 선택) -->
+  <div id="reserveModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-chair text-sm"></i>
+          </div>
+          <h3 class="font-bold text-slate-900 text-base">좌석 예약 신청</h3>
+        </div>
+        <button onclick="closeReserveModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="mt-4 space-y-4">
+        <!-- 선택된 좌석 정보 -->
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <div class="text-xs text-slate-500">선택 좌석</div>
+          <div class="text-lg font-bold text-slate-900 mt-0.5" id="modalSeatTitle">-</div>
+        </div>
+
+        <!-- 예약자 학생 선택 (이름) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">예약 학생 선택 (이름)</label>
+          <select
+            id="modalStudentSelect"
+            class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-medium text-slate-900 cursor-pointer"
+          >
+          </select>
+        </div>
+
+        <!-- 1. 시작 시간 선택 (요청 기능) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">시작 시간 선택</label>
+          <div class="flex items-center gap-2">
+            <input
+              type="time"
+              id="modalStartTimeInput"
+              class="flex-1 px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono text-center"
+              onchange="updateEndTimePreview()"
+            />
+            <button
+              type="button"
+              onclick="setModalTimeToNow()"
+              class="px-2.5 py-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium whitespace-nowrap"
+            >
+              현재 시각
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. 이용 시간 선택 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">이용 시간 선택</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onclick="selectDuration(1)"
+              class="duration-btn py-2.5 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+              data-hours="1"
+            >
+              1시간
+            </button>
+            <button
+              type="button"
+              onclick="selectDuration(2)"
+              class="duration-btn py-2.5 text-xs font-semibold rounded-lg border border-slate-900 bg-slate-900 text-white transition active-duration"
+              data-hours="2"
+            >
+              2시간
+            </button>
+            <button
+              type="button"
+              onclick="selectDuration(3)"
+              class="duration-btn py-2.5 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+              data-hours="3"
+            >
+              3시간
+            </button>
+          </div>
+        </div>
+
+        <!-- 예상 종료 시간 안내 -->
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs flex justify-between items-center text-emerald-800">
+          <span>예상 종료 시간:</span>
+          <span id="modalEndTimePreview" class="font-bold font-mono text-sm">-</span>
+        </div>
+      </div>
+
+      <!-- 모달 버튼 -->
+      <div class="mt-6 flex items-center gap-2">
+        <button
+          type="button"
+          onclick="closeReserveModal()"
+          class="flex-1 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          onclick="submitReservation()"
+          id="confirmReserveBtn"
+          class="flex-1 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5"
+        >
+          <span>예약 확정</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 토스트 알림 컨테이너 -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- JavaScript 통신 및 상태 로직 -->
+  <script>
+    const API_URL = localStorage.getItem("lib_gas_api_url") || "https://script.google.com/macros/s/AKfycbwIYnF9OWVvq5SaS1anlI2lUEdiTm1u7uGSYtQ6qV-zX79nRwbrb9WYxI8jStmjnL5A/exec";
+
+    // 25개 좌석 생성기
+    function generateInitial25Seats() {
+      const seats = [];
+      for (let i = 1; i <= 25; i++) {
+        const id = "S" + (i < 10 ? "0" + i : i);
+        let zone = "A구역 (일반)";
+        let seatNum = i;
+        if (i <= 10) { zone = "A구역 (일반)"; seatNum = i; }
+        else if (i <= 20) { zone = "B구역 (집중학습)"; seatNum = i - 10; }
+        else { zone = "C구역 (노트북존)"; seatNum = i - 20; }
+        seats.push({ seat_id: id, zone, seat_number: seatNum, status: "available" });
+      }
+      return seats;
+    }
+
+    // 시간 헬퍼 (HH:mm)
+    function formatTime(d) {
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function calculateEndTime(startTimeStr, hours) {
+      const [h, m] = startTimeStr.split(':').map(Number);
+      const endH = (h + hours) % 24;
+      return String(endH).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+
+    // 종료 시간이 현재 시각보다 이전인지 검사 (만료 여부 판정)
+    function isTimeExpired(endTimeStr) {
+      if (!endTimeStr) return false;
+      const trimmed = endTimeStr.trim();
+      const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+      if (match) {
+        const endH = parseInt(match[1], 10);
+        const endM = parseInt(match[2], 10);
+        const now = new Date();
+        const nowH = now.getHours();
+        const nowM = now.getMinutes();
+        if (nowH > endH) return true;
+        if (nowH === endH && nowM >= endM) return true;
+        return false;
+      }
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return Date.now() >= parsed.getTime();
+      }
+      return false;
+    }
+
+    function normalizeReservation(r) {
+      if (r.status === 'cancelled') return r;
+      if (isTimeExpired(r.end_time)) {
+        return { ...r, status: 'completed' };
+      }
+      return r;
+    }
+
+    // 영구 저장된 전체 예약 목록 로드 (초기 데이터 포함 및 만료 정규화)
+    function loadInitialReservations() {
+      const saved = localStorage.getItem("lib_all_reservations_v4") || localStorage.getItem("lib_all_reservations_v3");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map(normalizeReservation);
+          }
+        } catch (e) {}
+      }
+      const now = new Date();
+      const t1 = new Date(now.getTime() - 40 * 60 * 1000);
+      const e1 = new Date(t1.getTime() + 2 * 3600 * 1000);
+      const t2 = new Date(now.getTime() - 105 * 60 * 1000);
+      const e2 = new Date(t2.getTime() + 2 * 3600 * 1000);
+
+      const list = [
+        { reservation_id: "R-2401", seat_id: "S02", userId: "20230045", start_time: formatTime(t1), end_time: formatTime(e1), duration_hours: 2, status: "active", zone: "A구역 (일반)" },
+        { reservation_id: "R-2402", seat_id: "S07", userId: "20240112", start_time: formatTime(t2), end_time: formatTime(e2), duration_hours: 2, status: "expiring", zone: "A구역 (일반)" },
+        { reservation_id: "R-2403", seat_id: "S13", userId: "20240003", start_time: formatTime(new Date(now.getTime() - 10 * 60 * 1000)), end_time: formatTime(new Date(now.getTime() + 110 * 60 * 1000)), duration_hours: 2, status: "active", zone: "B구역 (집중학습)" },
+        { reservation_id: "R-2400", seat_id: "S01", userId: "20240001", start_time: "09:00", end_time: "11:00", duration_hours: 2, status: "completed", zone: "A구역 (일반)" }
+      ];
+      const normalized = list.map(normalizeReservation);
+      localStorage.setItem("lib_all_reservations_v4", JSON.stringify(normalized));
+      return normalized;
+    }
+
+    const STUDENTS = [
+      { id: '20240001', name: '20240001 (홍길동)', dept: '컴퓨터공학과' },
+      { id: '20240002', name: '20240002 (김영희)', dept: '경영학과' },
+      { id: '20240003', name: '20240003 (이철수)', dept: '기계공학과' },
+      { id: '20240004', name: '20240004 (박민수)', dept: '전자공학과' },
+      { id: '20240005', name: '20240005 (정수진)', dept: '국어국문학과' }
+    ];
+
+    function getStudent(id) {
+      return STUDENTS.find(s => s.id === id) || { id, name: id, dept: '재학생' };
+    }
+
+    // 상태 변수
+    let seatsData = generateInitial25Seats();
+    let allReservations = loadInitialReservations();
+    let currentFilterZone = "all";
+    let selectedSeat = null;
+    let selectedDurationHours = 2;
+    let currentUserReservation = null;
+    let adminFilterStatus = "all";
+    let currentUserId = localStorage.getItem("lib_userId") || "20240002";
+
+    window.addEventListener("DOMContentLoaded", () => {
+      populateStudentDropdowns();
+      renderZoneFilters();
+      renderSeats();
+      updateCounts();
+      fetchSeats();
+      fetchUserReservations();
+
+      // 1초마다 종료 시간이 지난 예약 자동 감지 및 좌석 상태 복구
+      setInterval(() => {
+        let hasChanges = false;
+        allReservations = allReservations.map(r => {
+          if ((r.status === 'active' || r.status === 'expiring') && isTimeExpired(r.end_time)) {
+            hasChanges = true;
+            return { ...r, status: 'completed' };
+          }
+          return r;
+        });
+
+        if (hasChanges) {
+          localStorage.setItem("lib_all_reservations_v4", JSON.stringify(allReservations));
+          renderSeats();
+          updateCounts();
+
+          if (currentUserReservation && isTimeExpired(currentUserReservation.end_time)) {
+            currentUserReservation = null;
+            document.getElementById("myReservationSection").classList.add("hidden");
+            showToast("좌석 이용 시간이 만료되어 자동 반납 처리되었습니다.", "info");
+          }
+
+          const adminView = document.getElementById("viewAdminDashboard");
+          if (adminView && !adminView.classList.contains("hidden")) {
+            renderAdminTable();
+          }
+        }
+      }, 1000);
+    });
+
+    function populateStudentDropdowns() {
+      const userSel = document.getElementById("userSelect");
+      const modalSel = document.getElementById("modalStudentSelect");
+      const opts = STUDENTS.map(s => `<option value="${s.id}" ${s.id === currentUserId ? 'selected' : ''}>${s.name} (${s.dept})</option>`).join('');
+      if (userSel) userSel.innerHTML = opts;
+      if (modalSel) modalSel.innerHTML = opts;
+    }
+
+    function onStudentChange(val) {
+      currentUserId = val;
+      localStorage.setItem("lib_userId", val);
+      const modalSel = document.getElementById("modalStudentSelect");
+      if (modalSel) modalSel.value = val;
+      const s = getStudent(val);
+      showToast(`${s.name} 학생 (${s.dept})으로 선택되었습니다.`, "info");
+      fetchUserReservations();
+    }
+
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = `p-3.5 rounded-xl shadow-lg text-xs sm:text-sm font-medium flex items-center gap-3 transition-all duration-200 pointer-events-auto ${
+        type === "success" ? "bg-emerald-800 text-white" :
+        type === "error" ? "bg-rose-800 text-white" : "bg-slate-900 text-white"
+      }`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : 'ℹ'}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+
+    // 뷰 전환: 'user' | 'admin'
+    function switchView(tab) {
+      const userView = document.getElementById("viewUserSeats");
+      const adminView = document.getElementById("viewAdminDashboard");
+      const tabUser = document.getElementById("viewTabUser");
+      const tabAdmin = document.getElementById("viewTabAdmin");
+
+      if (tab === 'admin') {
+        userView.classList.add("hidden");
+        adminView.classList.remove("hidden");
+        tabAdmin.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-white text-slate-900 shadow-2xs font-bold";
+        tabUser.className = "px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900";
+        renderAdminTable();
+      } else {
+        adminView.classList.add("hidden");
+        userView.classList.remove("hidden");
+        tabUser.className = "px-3 py-1.5 text-xs font-semibold rounded-md bg-white text-slate-900 shadow-2xs";
+        tabAdmin.className = "px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900";
+        renderSeats();
+      }
+    }
+
+    function toggleAdminView() {
+      const adminView = document.getElementById("viewAdminDashboard");
+      switchView(adminView.classList.contains("hidden") ? "admin" : "user");
+    }
+
+    // 1. 좌석 목록 조회
+    async function fetchSeats() {
+      try {
+        const response = await fetch(`${API_URL}?action=getSeats`, { method: "GET" });
+        const resData = await response.json();
+        if (resData.success && Array.isArray(resData.data)) {
+          const apiSeats = resData.data;
+          const base = generateInitial25Seats();
+          seatsData = base.map(s => {
+            const m = apiSeats.find(a => a.seat_id === s.seat_id);
+            return m ? { ...s, ...m } : s;
+          });
+        }
+      } catch (e) {
+        console.warn("GAS fetch warning:", e);
+      } finally {
+        renderSeats();
+        updateCounts();
+      }
+    }
+
+    // 2. 내 예약 조회 (선택된 학생 기준)
+    async function fetchUserReservations() {
+      const userSel = document.getElementById("userSelect");
+      const userId = userSel ? userSel.value : currentUserId;
+      currentUserId = userId;
+      localStorage.setItem("lib_userId", userId);
+
+      let found = allReservations.find(r => r.userId === userId && (r.status === 'active' || r.status === 'expiring') && !isTimeExpired(r.end_time));
+      const student = getStudent(userId);
+
+      try {
+        const response = await fetch(`${API_URL}?action=getUserReservations&userId=${encodeURIComponent(userId)}`, { method: "GET" });
+        const resData = await response.json();
+        if (resData.success && Array.isArray(resData.data) && resData.data.length > 0) {
+          const apiRes = resData.data.find(r => r.status === 'active' || !r.status);
+          if (apiRes) {
+            const possibleEnd = apiRes.end_time || calculateEndTime(formatTime(new Date()), 2);
+            if (!isTimeExpired(possibleEnd)) {
+              found = {
+                reservation_id: apiRes.reservation_id || "R-" + Math.floor(1000 + Math.random()*9000),
+                seat_id: apiRes.seat_id,
+                userId: userId,
+                start_time: apiRes.start_time || "이용중",
+                end_time: possibleEnd,
+                duration_hours: 2,
+                status: "active"
+              };
+            }
+          }
+        }
+      } catch (e) {}
+
+      if (found && isTimeExpired(found.end_time)) {
+        found = null;
+      }
+
+      if (found) {
+        currentUserReservation = found;
+        document.getElementById("resSeatName").textContent = found.seat_id;
+        document.getElementById("resUserId").textContent = `${student.name} 학생 (${found.userId} · ${student.dept})`;
+        document.getElementById("resStartTime").textContent = found.start_time;
+        document.getElementById("resEndTime").textContent = found.end_time;
+        document.getElementById("resId").textContent = found.reservation_id;
+        document.getElementById("myReservationSection").classList.remove("hidden");
+        showToast(`${student.name} 학생의 좌석(${found.seat_id}) 예약이 확인되었습니다.`, "success");
+      } else {
+        currentUserReservation = null;
+        document.getElementById("myReservationSection").classList.add("hidden");
+        showToast(`${student.name} 학생의 진행 중인 예약이 없습니다.`, "info");
+      }
+      renderSeats();
+    }
+
+    // 3. 좌석 예약 모달
+    function openReserveModal(seatId, zone, seatNum) {
+      selectedSeat = { seat_id: seatId, zone, seat_number: seatNum };
+      document.getElementById("modalSeatTitle").textContent = `${seatId} (${zone} ${seatNum}번)`;
+      const modalSel = document.getElementById("modalStudentSelect");
+      if (modalSel) modalSel.value = currentUserId;
+      
+      setModalTimeToNow();
+      selectDuration(2);
+      document.getElementById("reserveModal").classList.remove("hidden");
+    }
+
+    function closeReserveModal() {
+      document.getElementById("reserveModal").classList.add("hidden");
+      selectedSeat = null;
+    }
+
+    function setModalTimeToNow() {
+      document.getElementById("modalStartTimeInput").value = formatTime(new Date());
+      updateEndTimePreview();
+    }
+
+    function updateEndTimePreview() {
+      const st = document.getElementById("modalStartTimeInput").value || formatTime(new Date());
+      const et = calculateEndTime(st, selectedDurationHours);
+      document.getElementById("modalEndTimePreview").textContent = `${et} (${selectedDurationHours}시간 이용)`;
+    }
+
+    function selectDuration(hours) {
+      selectedDurationHours = hours;
+      document.querySelectorAll(".duration-btn").forEach(btn => {
+        const h = parseInt(btn.getAttribute("data-hours"));
+        if (h === hours) {
+          btn.className = "duration-btn py-2.5 text-xs font-semibold rounded-lg border border-slate-900 bg-slate-900 text-white transition";
+        } else {
+          btn.className = "duration-btn py-2.5 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition text-slate-700";
+        }
+      });
+      updateEndTimePreview();
+    }
+
+    // 4. 예약 확정 (선택된 학생 기준)
+    async function submitReservation() {
+      const modalSel = document.getElementById("modalStudentSelect");
+      const u = modalSel ? modalSel.value : currentUserId;
+      if (!u || !selectedSeat) return;
+
+      const student = getStudent(u);
+      const st = document.getElementById("modalStartTimeInput").value || formatTime(new Date());
+      const et = calculateEndTime(st, selectedDurationHours);
+
+      const newReservation = {
+        reservation_id: "R-" + Math.floor(1000 + Math.random() * 9000),
+        seat_id: selectedSeat.seat_id,
+        userId: u,
+        start_time: st,
+        end_time: et,
+        duration_hours: selectedDurationHours,
+        status: "active",
+        zone: selectedSeat.zone
+      };
+
+      allReservations = [newReservation, ...allReservations.filter(r => r.seat_id !== selectedSeat.seat_id || r.userId !== u)];
+      localStorage.setItem("lib_all_reservations_v4", JSON.stringify(allReservations));
+      currentUserId = u;
+      const userSel = document.getElementById("userSelect");
+      if (userSel) userSel.value = u;
+      localStorage.setItem("lib_userId", u);
+
+      closeReserveModal();
+      fetchUserReservations();
+      renderSeats();
+      showToast(`${student.name} 학생의 ${selectedSeat.seat_id} 좌석 예약이 완료되었습니다.`, "success");
+
+      // GAS POST 백그라운드 발송
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "reserveSeat",
+            userId: u,
+            seatId: selectedSeat.seat_id,
+            durationHours: selectedDurationHours,
+            startTime: st,
+            endTime: et
+          })
+        });
+      } catch (e) {}
+    }
+
+    // 5. 퇴실 / 반납 처리
+    async function handleCancelReservation(resIdToCancel = null) {
+      const target = resIdToCancel
+        ? allReservations.find(r => r.reservation_id === resIdToCancel)
+        : currentUserReservation;
+
+      if (!target) return;
+      if (!confirm(`${target.seat_id} 좌석을 퇴실(반납) 처리하시겠습니까?`)) return;
+
+      target.status = "cancelled";
+      localStorage.setItem("lib_all_reservations_v3", JSON.stringify(allReservations));
+
+      if (currentUserReservation && currentUserReservation.reservation_id === target.reservation_id) {
+        currentUserReservation = null;
+        document.getElementById("myReservationSection").classList.add("hidden");
+      }
+
+      renderSeats();
+      renderAdminTable();
+      showToast(`${target.seat_id} 좌석 퇴실/반납이 완료되었습니다.`, "success");
+
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "cancelReservation",
+            reservationId: target.reservation_id,
+            seatId: target.seat_id
+          })
+        });
+      } catch (e) {}
+    }
+
+    // 좌석 카드 그리드 렌더링 (사용중 좌석에 종료 시간 표시)
+    function renderSeats() {
+      const grid = document.getElementById("seatGrid");
+      const list = seatsData.filter(seat => {
+        if (currentFilterZone !== "all" && seat.zone !== currentFilterZone) return false;
+        return true;
+      });
+
+      grid.innerHTML = list.map(seat => {
+        const activeRes = allReservations.find(r => r.seat_id === seat.seat_id && (r.status === 'active' || r.status === 'expiring') && !isTimeExpired(r.end_time));
+        let isOccupied = !!activeRes;
+
+        // 만약 좌석 데이터가 occupied 상태더라도, 연결된 예약의 종료시간이 이미 지났다면 사용가능으로 전환
+        if (!isOccupied && seat.status === 'occupied') {
+          const pastRes = allReservations.find(r => r.seat_id === seat.seat_id);
+          if (pastRes && isTimeExpired(pastRes.end_time)) {
+            isOccupied = false;
+          }
+        }
+
+        const isMySeat = currentUserReservation && currentUserReservation.seat_id === seat.seat_id && !isTimeExpired(currentUserReservation.end_time);
+
+        const cardColor = isOccupied ? 'bg-rose-50/50 border-rose-200' : 'bg-white border-emerald-300 hover:border-emerald-500 cursor-pointer hover:-translate-y-0.5';
+        const badgeColor = isOccupied ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800';
+        const statusText = isOccupied ? '사용중' : '사용가능';
+
+        return `
+          <div
+            onclick="${!isOccupied ? `openReserveModal('${seat.seat_id}', '${seat.zone}', ${seat.seat_number})` : ''}"
+            class="relative rounded-xl border p-4 flex flex-col justify-between transition-all duration-200 ${cardColor}"
+          >
+            ${isMySeat ? `
+              <div class="absolute -top-2.5 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+                내 좌석
+              </div>
+            ` : ''}
+
+            <div class="flex items-start justify-between mb-2">
+              <span class="text-xs font-medium text-slate-500">${seat.zone}</span>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md ${badgeColor}">
+                ${statusText}
+              </span>
+            </div>
+
+            <div class="text-center py-2">
+              <div class="text-2xl font-bold tracking-tight text-slate-900 font-mono">${seat.seat_id}</div>
+              <div class="text-xs text-slate-400 mt-0.5">${seat.seat_number}번석</div>
+            </div>
+
+            <!-- 하단: 사용중 자리에 종료 시간 표시 -->
+            <div class="mt-2 pt-2.5 border-t border-slate-100 text-[11px]">
+              ${isOccupied ? `
+                <div class="bg-rose-100/70 border border-rose-200 px-2 py-1 rounded text-center">
+                  <span class="text-rose-800 font-bold font-mono">~ ${activeRes.end_time} 종료 예정</span>
+                </div>
+              ` : `
+                <div class="flex items-center justify-between text-emerald-700 font-semibold">
+                  <span>예약하기</span>
+                  <i class="fa-solid fa-chevron-right text-xs"></i>
+                </div>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateCounts();
+    }
+
+    // 관리자 전체 예약 목록 테이블 렌더링 (상태별 색상 구분)
+    function renderAdminTable() {
+      const tbody = document.getElementById("adminTableBody");
+      const search = (document.getElementById("adminSearchInput")?.value || "").toLowerCase().trim();
+
+      const filtered = allReservations.filter(res => {
+        if (adminFilterStatus !== "all" && res.status !== adminFilterStatus) return false;
+        if (search) {
+          if (!res.userId.toLowerCase().includes(search) && !res.seat_id.toLowerCase().includes(search) && !res.reservation_id.toLowerCase().includes(search)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="py-10 text-center text-slate-400 font-sans">예약 내역이 없습니다.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => {
+        let statusBadge = '';
+        let statusName = '';
+
+        if (r.status === 'active') {
+          statusBadge = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+          statusName = '이용중';
+        } else if (r.status === 'expiring') {
+          statusBadge = 'bg-amber-100 text-amber-900 border-amber-300';
+          statusName = '종료임박';
+        } else if (r.status === 'completed') {
+          statusBadge = 'bg-slate-100 text-slate-700 border-slate-300';
+          statusName = '이용완료';
+        } else {
+          statusBadge = 'bg-rose-100 text-rose-800 border-rose-200';
+          statusName = '취소/반납';
+        }
+
+        const canCancel = r.status === 'active' || r.status === 'expiring';
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="py-3 px-4 font-semibold text-slate-600">${r.reservation_id}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">${r.seat_id} <span class="font-normal font-sans text-slate-400 text-[11px]">(${r.zone || '일반'})</span></td>
+            <td class="py-3 px-4 font-bold text-slate-800">${r.userId}</td>
+            <td class="py-3 px-4 text-slate-600">${r.start_time}</td>
+            <td class="py-3 px-4 font-bold text-slate-900">${r.end_time}</td>
+            <td class="py-3 px-4 font-sans text-slate-500">${r.duration_hours}시간</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${statusBadge}">
+                ${statusName}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-right font-sans">
+              ${canCancel ? `
+                <button onclick="handleCancelReservation('${r.reservation_id}')" class="px-2.5 py-1 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded font-medium transition cursor-pointer">
+                  강제 반납
+                </button>
+              ` : `<span class="text-slate-400 text-xs">-</span>`}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function setAdminFilter(status) {
+      adminFilterStatus = status;
+      document.querySelectorAll(".admin-tab").forEach(btn => {
+        if (btn.getAttribute("data-af") === status) {
+          btn.className = "admin-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white";
+        } else {
+          btn.className = "admin-tab px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700";
+        }
+      });
+      renderAdminTable();
+    }
+
+    function setZoneFilter(zone) {
+      currentFilterZone = zone;
+      renderZoneFilters();
+      renderSeats();
+    }
+
+    function renderZoneFilters() {
+      const container = document.getElementById("zoneFilters");
+      const zones = Array.from(new Set(seatsData.map(s => s.zone))).filter(Boolean);
+
+      let html = `
+        <button
+          onclick="setZoneFilter('all')"
+          class="zone-tab-btn px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
+            currentFilterZone === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }"
+        >
+          전체 보기 (25)
+        </button>
+      `;
+
+      zones.forEach(zone => {
+        const isActive = currentFilterZone === zone;
+        html += `
+          <button
+            onclick="setZoneFilter('${zone}')"
+            class="zone-tab-btn px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
+              isActive ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }"
+          >
+            ${zone}
+          </button>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function updateCounts() {
+      const total = 25;
+      const occupied = allReservations.filter(r => r.status === 'active' || r.status === 'expiring').length;
+      const disabled = 2; // 점검석
+      const available = Math.max(0, total - occupied - disabled);
+
+      document.getElementById("statTotal").textContent = `${total}석`;
+      document.getElementById("statAvailable").textContent = `${available}석`;
+      document.getElementById("statOccupied").textContent = `${occupied}석`;
+      document.getElementById("statDisabled").textContent = `${disabled}석`;
+    }
+  </script>
+</body>
+</html>
