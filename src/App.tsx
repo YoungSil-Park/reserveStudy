@@ -33,7 +33,8 @@ import {
 } from 'lucide-react';
 import { TARGET_SPREADSHEET_ID, CODE_GS_SCRIPT } from './gasCode';
 
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwIYnF9OWVvq5SaS1anlI2lUEdiTm1u7uGSYtQ6qV-zX79nRwbrb9WYxI8jStmjnL5A/exec";
+const DEFAULT_GAS_API_URL = (import.meta.env.VITE_GAS_API_URL as string) || "https://script.google.com/macros/s/AKfycbwIYnF9OWVvq5SaS1anlI2lUEdiTm1u7uGSYtQ6qV-zX79nRwbrb9WYxI8jStmjnL5A/exec";
+const GAS_API_URL = DEFAULT_GAS_API_URL;
 
 // 실제 구글 시트 user 시트와 100% 일치하는 사용자 명단
 export interface Student {
@@ -317,7 +318,7 @@ export default function App() {
   
   // Google Apps Script 연동 & Code.gs 모달 상태
   const [gasApiUrl, setGasApiUrl] = useState<string>(() => {
-    return localStorage.getItem('lib_gas_api_url') || GAS_API_URL;
+    return localStorage.getItem('lib_gas_api_url') || DEFAULT_GAS_API_URL;
   });
   const [tempGasApiUrl, setTempGasApiUrl] = useState<string>(gasApiUrl);
   const [showGasModal, setShowGasModal] = useState<boolean>(false);
@@ -2140,6 +2141,19 @@ export default function App() {
                     우측 상단 <strong>[배포] &gt; [새 배포]</strong>를 누르고, <strong>유형: 웹 앱</strong>, <strong>액세스 권한: 모든 사용자(Anyone)</strong>로 설정한 뒤 배포 완료 후 나온 URL을 위 입력창에 넣고 [저장]을 누르면 완료됩니다.
                   </li>
                 </ol>
+              </div>
+
+              {/* 5. 깃허브 & 버셀(Vercel) 배포 안내 */}
+              <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl p-4 text-xs space-y-2 border border-slate-800 shadow-xs">
+                <div className="flex items-center gap-2 font-bold text-indigo-300">
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24"><path d="M24 22.525H0l12-21.05 12 21.05z"/></svg>
+                  <span>GitHub &amp; Vercel 배포 시 환경 변수 설정 팁</span>
+                </div>
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  Vercel 대시보드 <strong>Project Settings &gt; Environment Variables</strong>에<br/>
+                  이름: <code className="text-emerald-300 bg-slate-800/90 px-1.5 py-0.5 rounded font-mono font-semibold">VITE_GAS_API_URL</code> / 값: <span className="text-indigo-200">배포된 Apps Script URL</span> 을 등록해두면,
+                  Vercel 배포 사이트에 접속하는 모든 사용자에게 자동으로 구글 시트 연동이 적용됩니다.
+                </p>
               </div>
 
             </div>
